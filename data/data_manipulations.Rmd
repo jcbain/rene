@@ -1,0 +1,50 @@
+---
+title: "Data Manipulations"
+output: html_notebook
+---
+
+```{r}
+devtools::load_all()
+library(readr)
+library(dplyr)
+
+
+file <- '../tmp_data/m1e-4_mu1e-6_r1e-6_sigsqr5_mutations.txt'
+df <- read_delim(file, delim = ' ')
+
+# add p q values for each pop
+pq_df <- create_population_pq(df, c(p1_freq, p2_freq))
+
+# create a reference for popsize
+pop_popsize <- tibble(pop = c(1, 2), pop_size=c(1000, 1000))
+
+pq_df %>% 
+  append_popsize(pop_popsize, pop, pop) %>% 
+  filter(migr_rate == 1e-04 & mut_rate == 1e-06 & recomb_rate == 1e-06 & fitness_width == 5 & output_gen == 2500 & rep == 0 ) %>%
+  group_by(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep, pop)  %>%filter(origin_gen == min(origin_gen)) %>%
+  ungroup()
+
+pq_df %>% 
+  append_popsize(pop_popsize, pop, pop) %>% 
+  filter(migr_rate == 1e-04 & mut_rate == 1e-06 & recomb_rate == 1e-06 & fitness_width == 5 & output_gen == 2500 & rep == 0 ) %>%
+  group_by(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep, pop)  %>%filter(origin_gen == min(origin_gen)) %>%
+  ungroup() %>% mutate(twopq = 2 * p * q) %>%
+  group_by(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep) %>% summarize(hs = mean(twopq), ht = 2 * mean(p) * mean(q)) %>%
+  ungroup() %>% mutate(fst = (ht - hs)/ht)
+
+
+p1 <- .9985
+p2 <- 1
+q1 <- 1 - p1
+q2 <- 1 - p2
+pbar <- (p1 + p2)/2
+qbar <- (q1 + q2)/2
+ht <- 2 * pbar * qbar
+
+v1 <-2 * p1 * (1 - p1)
+v2 <- 2 * p2 * (1 - p2)
+hs <- (v1 + v2)/2
+
+(ht - hs)/ht
+```
+
