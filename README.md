@@ -1,10 +1,10 @@
 # `R`ené
 
-An `R` package for manipulating data simulated using (`SLiM`)[https://messerlab.org/slim/].
+An `R` package for manipulating data simulated using [`SLiM`](https://messerlab.org/slim/).
 
 ## Using Docker
 
-This package gives users the opportunity to run these scripts using a Docker image for consistent results across operating systems. To start using Docker visit (here)[https://www.docker.com/].
+This package gives users the opportunity to run these scripts using a Docker image for consistent results across operating systems. To start using Docker visit [here](https://www.docker.com/).
 
 For setup, in your terminal run:
 ```bash
