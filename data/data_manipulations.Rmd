@@ -12,11 +12,32 @@ library(dplyr)
 file <- '../tmp_data/m1e-4_mu1e-6_r1e-6_sigsqr5_mutations.txt'
 df <- read_delim(file, delim = ' ')
 
+pq_df <- create_population_pq(df, c(p1_freq, p2_freq))
+
+
+find_effect_size_freq <- function(data, effect_size_var, freq_var) {
+  data %>%
+    dplyr::mutate(effect_size_freq = {{ effect_size_var }} * {{ freq_var }})
+  
+}
+
+s
+
+pq_df %>% find_effect_size_freq(select_coef, q)
+
+
+
+```
+
+```{r}
 # add p q values for each pop
 pq_df <- create_population_pq(df, c(p1_freq, p2_freq))
 
 # create a reference for popsize
 pop_popsize <- tibble(pop = c(1, 2), pop_size=c(1000, 1000))
+
+
+  
 
 pq_df %>% 
   append_popsize(pop_popsize, pop, pop) %>% 
@@ -48,3 +69,10 @@ hs <- (v1 + v2)/2
 (ht - hs)/ht
 ```
 
+```{r}
+pq_df %>% 
+  append_popsize(df = pop_popsize, left_popref = pop, right_popref = pop) %>%
+  mutate(effect_size_freq = select_coef * q) %>%
+  group_by(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep) %>%
+  mutate(effect_size_freq_diff = )
+```
