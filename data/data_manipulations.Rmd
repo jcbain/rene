@@ -9,11 +9,16 @@ library(readr)
 library(dplyr)
 
 
-file <- '../tmp_data/m1e-4_mu1e-6_r1e-6_sigsqr5_mutations.txt'
+file <- '../tmp_data/m1e-5_mu1e-6_r1e-6_sigsqr25_mutations.txt'
 df <- read_delim(file, delim = ' ')
 
-pq_df <- create_population_pq(df, c(p1_freq, p2_freq))
-
+handle_stacked_mutations <- function(data, origin_var, effect_size_var, group_vars) {
+  data %>%
+    dplyr::group_by(dplyr::across({{ group_vars }})) %>%
+    dplyr::filter({{ origin_var }} == min({{ origin_var }})) %>%
+    dplyr::filter(abs({{ effect_size_var }}) == max(abs({{ effect_size_var }}))) %>%
+    dplyr::ungroup()
+}
 
 find_effect_size_freq <- function(data, effect_size_var, freq_var) {
   data %>%
@@ -21,9 +26,16 @@ find_effect_size_freq <- function(data, effect_size_var, freq_var) {
   
 }
 
-s
 
-pq_df %>% find_effect_size_freq(select_coef, q)
+df %>% handle_stacked_mutations(origin_var = origin_gen, effect_size_var = select_coef, group_vars = c(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep)) %>% create_population_pq(c(p1_freq, p2_freq)) %>% find_effect_size_freq(effect_size_var = select_coef, freq_var = q)
+
+
+
+
+
+
+
+
 
 
 
