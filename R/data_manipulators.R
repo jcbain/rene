@@ -15,8 +15,8 @@ create_population_pq <- function(data, pop_freq_vars) {
   pop_labels <- purrr::imap(1:n_pop_cols, ~ .y) %>% purrr::flatten_chr()
 
   data %>% dplyr::rename_at(vars({{ pop_freq_vars }}), ~ pop_labels) %>%
-    tidyr::pivot_longer(-!dplyr::all_of(pop_labels), names_to="pop", values_to="q") %>%
-    dplyr::mutate(p = 1 - q) %>% dplyr::mutate_at(vars(pop), as.numeric)
+    tidyr::pivot_longer(-!dplyr::all_of(pop_labels), names_to="pop", values_to="freq") %>%
+    dplyr::mutate_at(vars(pop), as.numeric)
 }
 
 #' Append the population sizes for each respective population to a data frame.

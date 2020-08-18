@@ -7,6 +7,7 @@ output: html_notebook
 devtools::load_all()
 library(readr)
 library(dplyr)
+library(ggplot2)
 
 
 file <- '../tmp_data/m1e-5_mu1e-6_r1e-6_sigsqr25_mutations.txt'
@@ -26,24 +27,63 @@ find_effect_size_freq <- function(data, effect_size_var, freq_var) {
   
 }
 
+calculate_fst <- function(data, freq_var, group_vars) {
+  fst_data <- data %>% 
+    dplyr::mutate(twopq = 2 * (1- {{ freq_var }}) * {{ freq_var }} ) %>%
+    dplyr::group_by(dplyr::across({{ group_vars }})) %>% 
+    dplyr::summarize(hs = mean(twopq), ht = 2 * mean((1- {{ freq_var }})) * mean({{ freq_var }})) %>%
+    dplyr::ungroup() %>% 
+    dplyr::mutate(fst = (ht - hs)/ht)
+  
+  dplyr::left_join(data, fst_data)
+    
+}
 
-df %>% handle_stacked_mutations(origin_var = origin_gen, effect_size_var = select_coef, group_vars = c(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep)) %>% create_population_pq(c(p1_freq, p2_freq)) %>% find_effect_size_freq(effect_size_var = select_coef, freq_var = q)
+  
 
 
 
+df %>% filter(rep == 0) %>%
+  handle_stacked_mutations(origin_var = origin_gen, effect_size_var = select_coef, 
+                           group_vars = c(position, migr_rate, mut_rate, recomb_rate, 
+                                          fitness_width, output_gen, rep)) %>% 
+  create_population_pq(c(p1_freq, p2_freq)) %>% 
+  find_effect_size_freq(effect_size_var = select_coef, freq_var = freq) %>%
+  calculate_fst(freq, c(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep))
 
+all_data <- purrr::map(list.files(path = '../tmp_data/good_runs', full.names = T), function(x) {
+  df <- readr::read_delim(x, " ")
+  df %>% 
+    filter(rep == 0) %>%
+  handle_stacked_mutations(origin_var = origin_gen, effect_size_var = select_coef, 
+                           group_vars = c(position, migr_rate, mut_rate, recomb_rate, 
+                                          fitness_width, output_gen, rep)) %>% 
+  create_population_pq(c(p1_freq, p2_freq)) %>% 
+  find_effect_size_freq(effect_size_var = select_coef, freq_var = freq) %>%
+  calculate_fst(freq, c(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep))
+}) %>% purrr::reduce(dplyr::bind_rows)
 
-
-
-
-
-
-
+jsonlite::write_json(all_data, "../tmp_data/genome_data.json")
 ```
 
 ```{r}
+
+
+df %>% filter(rep == 0) %>%
+  handle_stacked_mutations(origin_var = origin_gen, effect_size_var = select_coef, 
+                           group_vars = c(position, migr_rate, mut_rate, recomb_rate, 
+                                          fitness_width, output_gen, rep)) %>% 
+  create_population_pq(c(p1_freq, p2_freq)) %>% 
+  find_effect_size_freq(effect_size_var = select_coef, freq_var = freq) %>%
+  group_by(migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, pop) %>%
+  summarize(summed = sum(effect_size_freq)) %>%
+  ggplot(aes(x = output_gen, y = summed, color = pop, group= pop)) + geom_line()
 # add p q values for each pop
-pq_df <- create_population_pq(df, c(p1_freq, p2_freq))
+pq_df <- df %>% filter(rep == 0) %>%
+  handle_stacked_mutations(origin_var = origin_gen, effect_size_var = select_coef, 
+                           group_vars = c(position, migr_rate, mut_rate, recomb_rate, 
+                                          fitness_width, output_gen, rep)) %>% 
+  create_population_pq(c(p1_freq, p2_freq)) 
 
 # create a reference for popsize
 pop_popsize <- tibble(pop = c(1, 2), pop_size=c(1000, 1000))
@@ -58,11 +98,10 @@ pq_df %>%
   ungroup()
 
 pq_df %>% 
-  append_popsize(pop_popsize, pop, pop) %>% 
-  filter(migr_rate == 1e-04 & mut_rate == 1e-06 & recomb_rate == 1e-06 & fitness_width == 5 & output_gen == 2500 & rep == 0 ) %>%
-  group_by(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep, pop)  %>%filter(origin_gen == min(origin_gen)) %>%
-  ungroup() %>% mutate(twopq = 2 * p * q) %>%
-  group_by(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep) %>% summarize(hs = mean(twopq), ht = 2 * mean(p) * mean(q)) %>%
+  filter(migr_rate == 1e-05 & mut_rate == 1e-06 & recomb_rate == 1e-06 & fitness_width == 25 & output_gen == 2000 & rep == 0 ) %>%
+  mutate(twopq = 2 * (1-freq) * freq ) %>%
+  group_by(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep) %>% 
+  summarize(hs = mean(twopq), ht = 2 * mean((1-freq)) * mean(freq)) %>%
   ungroup() %>% mutate(fst = (ht - hs)/ht)
 
 
@@ -87,4 +126,10 @@ pq_df %>%
   mutate(effect_size_freq = select_coef * q) %>%
   group_by(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep) %>%
   mutate(effect_size_freq_diff = )
+```
+
+```{r}
+p1 <- read_delim("../tmp_data/m1e-3_mu1e-6_r1e-6_sigsqr5_genome1.txt", delim = " ")
+p2 <- read_delim("../tmp_data/m1e-3_mu1e-6_r1e-6_sigsqr5_genome2.txt", delim = " ")
+
 ```
