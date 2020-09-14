@@ -9,6 +9,21 @@ library(readr)
 library(dplyr)
 library(ggplot2)
 
+# grab all the paths to the mutation files
+all_mutation_files <- list.files(path="../tmp_data/pop_runs/", 
+                                 pattern="*mutations.txt",
+                                 recursive = T)
+
+```
+
+
+
+```{r}
+devtools::load_all()
+library(readr)
+library(dplyr)
+library(ggplot2)
+
 
 file <- '../tmp_data/m1e-5_mu1e-6_r1e-6_sigsqr25_mutations.txt'
 df <- read_delim(file, delim = ' ')
@@ -19,6 +34,11 @@ handle_stacked_mutations <- function(data, origin_var, effect_size_var, group_va
     dplyr::filter({{ origin_var }} == min({{ origin_var }})) %>%
     dplyr::filter(abs({{ effect_size_var }}) == max(abs({{ effect_size_var }}))) %>%
     dplyr::ungroup()
+}
+
+find_diff_effect_size_freq_diff <- function(data, p1_freq_var, p2_freq_var, effect_size_var) {
+  data %>% 
+    dplyr::mutate(effect_size_freq_diff = ({{ p1_freq_var }} - {{ p2_freq_var }}) * {{ effect_size_var }})
 }
 
 find_effect_size_freq <- function(data, effect_size_var, freq_var) {
@@ -47,22 +67,38 @@ df %>% filter(rep == 0) %>%
   handle_stacked_mutations(origin_var = origin_gen, effect_size_var = select_coef, 
                            group_vars = c(position, migr_rate, mut_rate, recomb_rate, 
                                           fitness_width, output_gen, rep)) %>% 
+  find_diff_effect_size_freq_diff(p1_freq, p2_freq, select_coef) %>%
   create_population_pq(c(p1_freq, p2_freq)) %>% 
   find_effect_size_freq(effect_size_var = select_coef, freq_var = freq) %>%
   calculate_fst(freq, c(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep))
 
-all_data <- purrr::map(list.files(path = '../tmp_data/good_runs', full.names = T), function(x) {
+
+files <- c( "../tmp_data/good_runs/m1e-3_mu1e-6_r1e-6_sigsqr25_mutations.txt",
+   "../tmp_data/good_runs/m1e-4_mu1e-6_r1e-6_sigsqr25_mutations.txt",
+   "../tmp_data/good_runs/m1e-5_mu1e-6_r1e-6_sigsqr25_mutations.txt",
+   "../tmp_data/good_runs/m1e-3_mu1e-6_r1e-6_sigsqr2_mutations.txt",
+   "../tmp_data/good_runs/m1e-4_mu1e-6_r1e-6_sigsqr2_mutations.txt",
+   "../tmp_data/good_runs/m1e-5_mu1e-6_r1e-6_sigsqr2_mutations.txt",
+   "../tmp_data/good_runs/m1e-3_mu1e-6_r1e-6_sigsqr5_mutations.txt",
+   "../tmp_data/good_runs/m1e-4_mu1e-6_r1e-6_sigsqr5_mutations.txt",
+   "../tmp_data/good_runs/m1e-5_mu1e-6_r1e-6_sigsqr5_mutations.txt"
+   
+)
+all_data <- purrr::map(files, function(x) {
   df <- readr::read_delim(x, " ")
   df %>% 
     filter(rep == 0) %>%
   handle_stacked_mutations(origin_var = origin_gen, effect_size_var = select_coef, 
                            group_vars = c(position, migr_rate, mut_rate, recomb_rate, 
                                           fitness_width, output_gen, rep)) %>% 
+  find_diff_effect_size_freq_diff(p1_freq, p2_freq, select_coef) %>%
   create_population_pq(c(p1_freq, p2_freq)) %>% 
   find_effect_size_freq(effect_size_var = select_coef, freq_var = freq) %>%
-  calculate_fst(freq, c(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep))
-}) %>% purrr::reduce(dplyr::bind_rows)
+  calculate_fst(freq, c(position, migr_rate, mut_rate, recomb_rate, fitness_width, output_gen, rep)) 
+}) %>% purrr::reduce(dplyr::bind_rows) %>% dplyr::rename(m = migr_rate, mu = mut_rate, r = recomb_rate, sigsqr = fitness_width)
 
+all_data %>% View()
+all_data %>% filter( m == 1e-3 & mu == 1e-6 & r == 1e-6 & sigsqr == 25 & output_gen == 4000) %>% group_by(pop) %>% summarise(sum(effect_size_freq_diff))
 jsonlite::write_json(all_data, "../tmp_data/genome_data.json")
 ```
 
