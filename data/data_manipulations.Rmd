@@ -8,14 +8,47 @@ devtools::load_all()
 library(readr)
 library(dplyr)
 library(ggplot2)
+library(purrr)
 
 # grab all the paths to the mutation files
-all_mutation_files <- list.files(path="../tmp_data/pop_runs/", 
-                                 pattern="*mutations.txt",
+all_mutation_files <- list.files(path = "../tmp_data/pop_runs/", 
+                                 pattern = "*mutations.txt",
+                                 full.names = T,
                                  recursive = T)
 
+# grab a genome template file
+genome_template_file <- list.files(path = "../tmp_data/pop_runs/",
+                                   pattern = "*fullgenome.txt",
+                                   full.names = T,
+                                   recursive = T)[1]
+
+mutations <- read_delim(all_mutation_files[1], delim=" ") %>% filter(rep == 0)
+genome_template <- read_delim(genome_template_file, delim = " ") %>% select(position)
 ```
 
+
+```{r}
+
+uniq_generations <- mutations %>% group_by(output_gen) %>% summarize() %>% pull()
+map(uniq_generations, function(x) {
+  mutation_generation <- mutations %>% filter(output_gen == x)
+  mutation_params <- mutations %>% 
+    select(c(migr_rate, recomb_rate, mut_rate,
+             fitness_width, n, output_gen)) %>%
+    head(1)
+  mutation_without_params <- mutations %>% select(-c(migr_rate, recomb_rate, mut_rate,
+             fitness_width, n, output_gen))
+  num_param_cols <- ncol(mutation_params)
+  num_template_rows <- nrow(genome_template)
+  template_param_rows <- mutation_params %>% slice(rep(1:num_param_cols, each = num_template_rows))
+  template <- bind_cols(genome_template, template_param_rows)
+  left_join(template, mutation_generation)
+}) %>% reduce(bind_rows)
+```
+
+```{r}
+?right_join
+```
 
 
 ```{r}
