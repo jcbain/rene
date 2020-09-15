@@ -37,3 +37,49 @@ append_popsize = function(df, pop_df, left_popref=pop, right_popref=pop) {
   dplyr::left_join(renamed_df, renamed_popdf, by='pop')
 }
 
+#' Join template genome position to a single parameter
+#' of mutations
+#'
+#' The default output mutations doesn't include a value for
+#'  neutral positions as a way to save resources when simulations
+#'  are running. This function joins on the template genome
+#'  (essentially a template for the positions on the genome) to
+#'  the mutation data so that each position per each generation
+#'  has a row. This may or may not be the appropriate method
+#'  depending on how you plan to use the data next.
+#'
+#' @param mutation_df A data frame of mutations for a given
+#'  parameter set
+#' @param template A data frame of all the positions on the
+#'  genome corresponding to the mutations
+#' @param generation_var The variable in the `mutation_df`
+#'  corresponding to the the output generation variable
+#' @param param_vars A vector of parameter variable names in
+#'  the `mutation_df` frame
+#' @return An expanded mutation data frame with empty (neutral)
+#'  position rows
+#' @export
+expand_genome_to_template <- function(mutation_df, template, generation_var, param_vars) {
+  uniq_generations <- mutation_df %>%
+    dplyr::group_by({{ generation_var }}) %>%
+    dplyr::summarize() %>% dplyr::pull()
+
+  purrr::map(uniq_generations, function(gen) {
+    mutation_generation <- mutation_df %>%
+      dplyr::filter({{generation_var}} == gen)
+    mutation_params <- mutation_df %>%
+      dplyr::select(c({{ param_vars }})) %>% head(1)
+    mutation_without_params <- mutation_df %>%
+      dplyr::select(-c({{ param_vars }}))
+
+    num_param_cols <- ncol(mutation_params)
+    num_template_rows <- nrow(template)
+
+    template_param_rows <- mutation_params %>%
+      dplyr::slice(rep(1:num_param_cols, each = num_template_rows))
+    full_template <- dplyr::bind_cols(template, template_param_rows)
+    dplyr::left_join(full_template, mutation_generation)
+  }) %>% purrr::reduce(dplyr::bind_rows)
+}
+
+
