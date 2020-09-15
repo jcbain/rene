@@ -25,45 +25,27 @@ genome_template_file <- list.files(path = "../tmp_data/pop_runs/",
 
 mutations <- read_delim(all_mutation_files[1], delim=" ") %>% filter(rep == 0)
 genome_template <- read_delim(genome_template_file, delim = " ") %>% select(position)
+
+all_data <- purrr::map(all_mutation_files, function(x) {
+  df <- readr::read_delim(x, " ")
+  df %>% 
+    filter(rep == 0) %>%
+  handle_stacked_mutations(origin_var = origin_gen, effect_size_var = select_coef, 
+                           group_vars = c(position, migr_rate, mut_rate, recomb_rate, n,
+                                          fitness_width, output_gen, rep)) %>% 
+  find_diff_effect_size_freq_diff(p1_freq, p2_freq, select_coef) %>%
+  create_population_pq(c(p1_freq, p2_freq)) %>% 
+  find_effect_size_freq(effect_size_var = select_coef, freq_var = freq) %>%
+  calculate_fst(freq, c(position, migr_rate, mut_rate, recomb_rate, fitness_width, n, output_gen, rep)) 
+}) %>% purrr::reduce(dplyr::bind_rows) %>% dplyr::rename(m = migr_rate, mu = mut_rate, r = recomb_rate, sigsqr = fitness_width)
+
+all_data <- all_data %>% select(-c(hs, ht, origin_gen))
+
+jsonlite::write_json(all_data, "../tmp_data/genome_data_full.json")
 ```
 
 
 ```{r}
-
-expand_genome_to_template(mutations, template = genome_template, generation_var = output_gen, param_vars = c(migr_rate, recomb_rate, mut_rate, fitness_width, n, output_gen, rep))
-
-uniq_generations <- mutations %>% group_by(output_gen) %>% summarize() %>% pull()
-map(uniq_generations, function(x) {
-  mutation_generation <- mutations %>% filter(output_gen == x)
-  mutation_params <- mutations %>% 
-    select(c(migr_rate, recomb_rate, mut_rate,
-             fitness_width, n, output_gen, rep)) %>%
-    head(1)
-  mutation_without_params <- mutations %>% select(-c(migr_rate, recomb_rate, mut_rate,
-             fitness_width, n, output_gen))
-  num_param_cols <- ncol(mutation_params)
-  num_template_rows <- nrow(genome_template)
-  template_param_rows <- mutation_params %>% slice(rep(1:num_param_cols, each = num_template_rows))
-  template <- bind_cols(genome_template, template_param_rows)
-  left_join(template, mutation_generation)
-}) %>% reduce(bind_rows) %>% replace_na(list(select_coef = 0, p1_freq = 0, p2_freq = 0))
-```
-
-```{r}
-?right_join
-```
-
-
-```{r}
-devtools::load_all()
-library(readr)
-library(dplyr)
-library(ggplot2)
-
-
-file <- '../tmp_data/m1e-5_mu1e-6_r1e-6_sigsqr25_mutations.txt'
-df <- read_delim(file, delim = ' ')
-
 handle_stacked_mutations <- function(data, origin_var, effect_size_var, group_vars) {
   data %>%
     dplyr::group_by(dplyr::across({{ group_vars }})) %>%
@@ -95,6 +77,32 @@ calculate_fst <- function(data, freq_var, group_vars) {
     
 }
 
+mutations %>% 
+  handle_stacked_mutations(origin_var = origin_gen, effect_size_var = select_coef, 
+                           group_vars = c(position, migr_rate, mut_rate, n,
+                                          recomb_rate, fitness_width, output_gen, rep)) %>%
+expand_genome_to_template(template = genome_template, generation_var = output_gen, param_vars = c(migr_rate, recomb_rate, mut_rate, fitness_width, n, output_gen, rep))  
+
+```
+
+
+```{r}
+?right_join
+```
+
+
+```{r}
+devtools::load_all()
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+
+file <- '../tmp_data/m1e-5_mu1e-6_r1e-6_sigsqr25_mutations.txt'
+df <- read_delim(file, delim = ' ')
+
+
+
   
 
 
@@ -120,6 +128,8 @@ files <- c( "../tmp_data/good_runs/m1e-3_mu1e-6_r1e-6_sigsqr25_mutations.txt",
    "../tmp_data/good_runs/m1e-5_mu1e-6_r1e-6_sigsqr5_mutations.txt"
    
 )
+
+
 all_data <- purrr::map(files, function(x) {
   df <- readr::read_delim(x, " ")
   df %>% 
@@ -205,3 +215,23 @@ p1 <- read_delim("../tmp_data/m1e-3_mu1e-6_r1e-6_sigsqr5_genome1.txt", delim = "
 p2 <- read_delim("../tmp_data/m1e-3_mu1e-6_r1e-6_sigsqr5_genome2.txt", delim = " ")
 
 ```
+
+Functions that are now implemented in the rene namespace
+```{r}
+uniq_generations <- mutations %>% group_by(output_gen) %>% summarize() %>% pull()
+map(uniq_generations, function(x) {
+  mutation_generation <- mutations %>% filter(output_gen == x)
+  mutation_params <- mutations %>% 
+    select(c(migr_rate, recomb_rate, mut_rate,
+             fitness_width, n, output_gen, rep)) %>%
+    head(1)
+  mutation_without_params <- mutations %>% select(-c(migr_rate, recomb_rate, mut_rate,
+             fitness_width, n, output_gen))
+  num_param_cols <- ncol(mutation_params)
+  num_template_rows <- nrow(genome_template)
+  template_param_rows <- mutation_params %>% slice(rep(1:num_param_cols, each = num_template_rows))
+  template <- bind_cols(genome_template, template_param_rows)
+  left_join(template, mutation_generation)
+}) %>% reduce(bind_rows) %>% replace_na(list(select_coef = 0, p1_freq = 0, p2_freq = 0))
+```
+
