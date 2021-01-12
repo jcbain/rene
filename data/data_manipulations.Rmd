@@ -26,7 +26,9 @@ genome_template_file <- list.files(path = "../tmp_data/pop_runs/",
 mutations <- read_delim(all_mutation_files[1], delim=" ") %>% filter(rep == 0)
 genome_template <- read_delim(genome_template_file, delim = " ") %>% select(position)
 
-all_data <- purrr::map(all_mutation_files, function(x) {
+
+
+all_data <- purrr::map(all_mutation_files[1:5], function(x) {
   df <- readr::read_delim(x, " ")
   df %>% 
     filter(rep == 0) %>%
@@ -39,7 +41,7 @@ all_data <- purrr::map(all_mutation_files, function(x) {
   calculate_fst(freq, c(position, migr_rate, mut_rate, recomb_rate, fitness_width, n, output_gen, rep)) 
 }) %>% purrr::reduce(dplyr::bind_rows) %>% dplyr::rename(m = migr_rate, mu = mut_rate, r = recomb_rate, sigsqr = fitness_width)
 
-all_data <- all_data %>% select(-c(hs, ht, origin_gen))
+all_data <- all_data %>% select(-c(hs, ht, origin_gen)) %>% left_join(genome_template %>% mutate(positional_map = row_number()))
 
 jsonlite::write_json(all_data, "../tmp_data/genome_data_full.json")
 ```
