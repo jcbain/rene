@@ -11,17 +11,30 @@ library(ggplot2)
 library(purrr)
 library(tidyr)
 
+DATADIR <- '../tmp_data/'
+RUNDIR <- 'jan_2021_runs/'
+CURRENTREP <- 0
+
 # grab all the paths to the mutation files
-all_mutation_files <- list.files(path = "../tmp_data/pop_runs/", 
+all_mutation_files <- list.files(path = paste0(DATADIR, RUNDIR), 
                                  pattern = "*mutations.txt",
                                  full.names = T,
                                  recursive = T)
 
 # grab a genome template file
-genome_template_file <- list.files(path = "../tmp_data/pop_runs/",
+genome_template_file <- list.files(path = paste0(DATADIR, RUNDIR),
                                    pattern = "*fullgenome.txt",
                                    full.names = T,
                                    recursive = T)[1]
+
+mutations <- read_delim(all_mutation_files[1], delim=" ") %>% filter(rep == 0)
+genome_template <- read_delim(genome_template_file, delim = " ") %>% select(position)
+
+mutations %>% mutate(p1_select_by_freq = select_coef * p1_freq, p2_select_by_freq = select_coef * p2_freq) %>% mutate(effect_size = p1_select_by_freq - p2_select_by_freq) %>% write_csv(path="../tmp_data/tmp_file.csv")
+```
+
+
+```{r}
 
 mutations <- read_delim(all_mutation_files[1], delim=" ") %>% filter(rep == 0)
 genome_template <- read_delim(genome_template_file, delim = " ") %>% select(position)
